@@ -1,0 +1,60 @@
+<?php
+// $Id$
+
+/**
+ * Error occurs when WSDL cache could not be created
+ */
+define('SAFESOAP_CACHE_ERROR', 1);
+
+/** 
+ * A child of SoapClient with network failure handling support
+ * 
+ */ 
+class SafeSoapClient extends SoapClient { 
+    
+    public function __construct($wsdl, $options = array()) { 
+        $wsdl_addr_type = parse_url($wsdl, PHP_URL_SCHEME);
+
+        if (strncmp($wsdl_addr_type,'http',4)==0) {
+            $cache_file = sys_get_temp_dir() . "/safe_soap.wsdl-" . md5($wsdl); 
+        
+            $url = $wsdl;
+            $wsdl = $cache_file;
+            //only fetch a new wsdl every hour
+            if(!file_exists($cache_file) || filectime($cache_file) < time() - 3600) { 
+                if (!file_put_contents( $cache_file, $this->callCurl($url))){
+                    throw new SoapFault(SAFESOAP_CACHE_ERROR, "Service description unavailable");
+                }
+            }
+        }
+        
+        parent::__construct($wsdl, $options); 
+    } 
+    
+    /** 
+     * Call a url using curl 
+     * 
+     * @param string $url 
+     * @param string $data 
+     * @return string 
+     * @throws SoapFault on curl connection error 
+     */ 
+    protected function callCurl($url, $data=NULL) { 
+        $handle = curl_init(); 
+        curl_setopt($handle, CURLOPT_HEADER, FALSE); 
+        curl_setopt($handle, CURLOPT_URL, $url); 
+        curl_setopt($handle, CURLOPT_FAILONERROR, TRUE); 
+        curl_setopt($handle, CURLOPT_HTTPHEADER, Array("PHP SOAP Client")); 
+        curl_setopt($handle, CURLOPT_RETURNTRANSFER, TRUE); 
+        if (isset( $data )) {
+            curl_setopt($handle, CURLOPT_POSTFIELDS, $data); 
+        }
+        $response = curl_exec($handle); 
+        if (empty($response)) { 
+          throw new SoapFault('Network error: ' . curl_error($handle),curl_errno($handle)); 
+        } 
+        curl_close($handle); 
+        return $response; 
+    } 
+    
+}

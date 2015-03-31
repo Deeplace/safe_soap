@@ -1,0 +1,5 @@
+; $Id$
+name = Safe SOAP
+description = Allow network-failure safe use of SoapClient
+version = 1.0
+core = 6.x
