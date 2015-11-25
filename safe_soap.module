@@ -6,77 +6,77 @@
  */
 define('SAFESOAP_CACHE_ERROR', 1);
 
-/** 
+/**
  * A child of SoapClient with network failure handling support
- * 
- */ 
-class SafeSoapClient extends SoapClient { 
-   
-    /**
-     * SafeSoapClient constructor following extensions over SoapClient::__construct():
-     * 
-     * * $options['certificate_chain'] - path to file containing both client auth certificate chain and server certificate chain
-     *                                  This is workaround for libcurl compiled against NSS (vs. OpenSSL) which does not send 
-     *                                  chain passed via CURLOPT_SSLCERT, and requires both chains set via CURLOPT_CAINFO
-     */
-    public function __construct($wsdl, $options = array()) { 
-        $wsdl_addr_type = parse_url($wsdl, PHP_URL_SCHEME);
+ *
+ */
+class SafeSoapClient extends SoapClient {
 
-        if (strncmp($wsdl_addr_type, 'http', 4)==0) {
-            $cache_file = sys_get_temp_dir() . "/safe_soap.wsdl-" . md5($wsdl); 
-        
-            $url = $wsdl;
-            $wsdl = $cache_file;
-            //only fetch a new wsdl every hour
-            if(!file_exists($cache_file) || filectime($cache_file) < time() - 3600) { 
-                if (!file_put_contents( $cache_file, $this->callCurl($url, NULL, $options))){
-                    throw new SoapFault(SAFESOAP_CACHE_ERROR, "Service description unavailable");
-                }
-            }
+  /**
+   * SafeSoapClient constructor following extensions over SoapClient::__construct():
+   *
+   * * $options['certificate_chain'] - path to file containing both client auth certificate chain and server certificate chain
+   *                                  This is workaround for libcurl compiled against NSS (vs. OpenSSL) which does not send
+   *                                  chain passed via CURLOPT_SSLCERT, and requires both chains set via CURLOPT_CAINFO
+   */
+  public function __construct($wsdl, $options = array()) {
+    $wsdl_addr_type = parse_url($wsdl, PHP_URL_SCHEME);
+
+    if (strncmp($wsdl_addr_type, 'http', 4)==0) {
+      $cache_file = sys_get_temp_dir() . "/safe_soap.wsdl-" . md5($wsdl);
+
+      $url = $wsdl;
+      $wsdl = $cache_file;
+      //only fetch a new wsdl every hour
+      if(!file_exists($cache_file) || filectime($cache_file) < time() - 3600) {
+        if (!file_put_contents( $cache_file, $this->callCurl($url, NULL, $options))){
+          throw new SoapFault(SAFESOAP_CACHE_ERROR, "Service description unavailable");
         }
-        
-        parent::__construct($wsdl, $options); 
-    } 
-    
-    /** 
-     * Call a url using curl 
-     * 
-     * @param string $url 
-     * @param string $data 
-     * @param array $options = array()
-     * @return string 
-     * @throws SoapFault on curl connection error 
-     */ 
-    protected function callCurl($url, $data = NULL, $options = array()) {
-        $handle = curl_init(); 
-        curl_setopt($handle, CURLOPT_HEADER, FALSE); 
-        curl_setopt($handle, CURLOPT_URL, $url); 
-        curl_setopt($handle, CURLOPT_FAILONERROR, TRUE); 
-        curl_setopt($handle, CURLOPT_HTTPHEADER, array("PHP SOAP Client")); 
-        curl_setopt($handle, CURLOPT_RETURNTRANSFER, TRUE); 
-        if (array_key_exists('local_cert', $options)) {
-          curl_setopt($handle, CURLOPT_SSLCERT, $options['local_cert']); 
-          if (array_key_exists('certificate_chain', $options)) {
-            curl_setopt($handle, CURLOPT_SSLKEY, $options['local_cert']); 
-          }
-          if (array_key_exists('passphrase', $options)) {
-            curl_setopt($handle, CURLOPT_KEYPASSWD, $options['passphrase']);
-            curl_setopt($handle, CURLOPT_SSLCERTPASSWD, $options['passphrase']);
-          }
-        }
-        if (array_key_exists('certificate_chain', $options)) {
-          curl_setopt($handle, CURLOPT_CAINFO, $options['certificate_chain']); 
-        }
-          
-        if (isset( $data )) {
-            curl_setopt($handle, CURLOPT_POSTFIELDS, $data); 
-        }
-        $response = curl_exec($handle); 
-        if (empty($response)) { 
-          throw new SoapFault('Network error: ' . curl_error($handle), curl_errno($handle)); 
-        } 
-        curl_close($handle); 
-        return $response; 
-    } 
-    
+      }
+    }
+
+    parent::__construct($wsdl, $options);
+  }
+
+  /**
+   * Call a url using curl
+   *
+   * @param string $url
+   * @param string $data
+   * @param array $options = array()
+   * @return string
+   * @throws SoapFault on curl connection error
+   */
+  protected function callCurl($url, $data = NULL, $options = array()) {
+    $handle = curl_init();
+    curl_setopt($handle, CURLOPT_HEADER, FALSE);
+    curl_setopt($handle, CURLOPT_URL, $url);
+    curl_setopt($handle, CURLOPT_FAILONERROR, TRUE);
+    curl_setopt($handle, CURLOPT_HTTPHEADER, array("PHP SOAP Client"));
+    curl_setopt($handle, CURLOPT_RETURNTRANSFER, TRUE);
+    if (array_key_exists('local_cert', $options)) {
+      curl_setopt($handle, CURLOPT_SSLCERT, $options['local_cert']);
+      if (array_key_exists('certificate_chain', $options)) {
+        curl_setopt($handle, CURLOPT_SSLKEY, $options['local_cert']);
+      }
+      if (array_key_exists('passphrase', $options)) {
+        curl_setopt($handle, CURLOPT_KEYPASSWD, $options['passphrase']);
+        curl_setopt($handle, CURLOPT_SSLCERTPASSWD, $options['passphrase']);
+      }
+    }
+    if (array_key_exists('certificate_chain', $options)) {
+      curl_setopt($handle, CURLOPT_CAINFO, $options['certificate_chain']);
+    }
+
+    if (isset( $data )) {
+      curl_setopt($handle, CURLOPT_POSTFIELDS, $data);
+    }
+    $response = curl_exec($handle);
+    if (empty($response)) {
+      throw new SoapFault(curl_errno($handle), 'Network error: ' . curl_error($handle));
+    }
+    curl_close($handle);
+    return $response;
+  }
+
 }
