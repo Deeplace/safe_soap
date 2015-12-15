@@ -73,7 +73,7 @@ class SafeSoapClient extends SoapClient {
     }
     $response = curl_exec($handle);
     if (empty($response)) {
-      throw new SoapFault(curl_errno($handle), 'Network error: ' . curl_error($handle));
+      throw new SoapFault((string)curl_errno($handle), 'Network error: ' . curl_error($handle));
     }
     curl_close($handle);
     return $response;
