@@ -1,5 +1,7 @@
 ; $Id$
 name = Safe SOAP
 description = Allow network-failure safe use of SoapClient
-version = 1.0
-core = 6.x
+version = 7.x-1.0
+core = 7.x
+
+files[] = safe_soap.module
