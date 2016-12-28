@@ -1,36 +1,43 @@
 <?php
-// $Id$
 
 /**
- * Error occurs when WSDL cache could not be created
+ * @file
+ * SafeSoapClient wrapper class.
  */
-define('SAFESOAP_CACHE_ERROR', 1);
 
 /**
- * A child of SoapClient with network failure handling support
- *
+ * Error code what occur when WSDL cache could not be created.
+ */
+define('SAFE_SOAP_CACHE_ERROR', 1);
+
+/**
+ * A child of SoapClient with network failure handling support.
  */
 class SafeSoapClient extends SoapClient {
 
   /**
-   * SafeSoapClient constructor following extensions over SoapClient::__construct():
+   * Extended SoapClient constructor.
    *
-   * * $options['certificate_chain'] - path to file containing both client auth certificate chain and server certificate chain
-   *                                  This is workaround for libcurl compiled against NSS (vs. OpenSSL) which does not send
-   *                                  chain passed via CURLOPT_SSLCERT, and requires both chains set via CURLOPT_CAINFO
+   * SafeSoapClient constructor following extensions over
+   * SoapClient::__construct():
+   *  - $options['certificate_chain'] - path to file containing both client
+   *    auth certificate chain and server certificate chain. This is workaround
+   *    for libcurl compiled against NSS (vs. OpenSSL) which does not send
+   *    chain passed via CURLOPT_SSLCERT, and requires both chains set
+   *    via CURLOPT_CAINFO.
    */
   public function __construct($wsdl, $options = array()) {
     $wsdl_addr_type = parse_url($wsdl, PHP_URL_SCHEME);
 
-    if (strncmp($wsdl_addr_type, 'http', 4)==0) {
+    if (strncmp($wsdl_addr_type, 'http', 4) === 0) {
       $cache_file = sys_get_temp_dir() . "/safe_soap.wsdl-" . md5($wsdl);
 
       $url = $wsdl;
       $wsdl = $cache_file;
-      //only fetch a new wsdl every hour
-      if(!file_exists($cache_file) || filectime($cache_file) < time() - 3600) {
-        if (!file_put_contents( $cache_file, $this->callCurl($url, NULL, $options))){
-          throw new SoapFault(SAFESOAP_CACHE_ERROR, "Service description unavailable");
+      // Only fetch a new wsdl every hour.
+      if (!file_exists($cache_file) || filectime($cache_file) < time() - 3600) {
+        if (!file_put_contents($cache_file, $this->callCurl($url, NULL, $options))) {
+          throw new SoapFault(SAFE_SOAP_CACHE_ERROR, "Service description unavailable");
         }
       }
     }
@@ -39,13 +46,25 @@ class SafeSoapClient extends SoapClient {
   }
 
   /**
-   * Call a url using curl
+   * Call a url using curl.
    *
    * @param string $url
+   *   URL to request.
    * @param string $data
-   * @param array $options = array()
+   *   URL encoded POST params.
+   * @param array $options
+   *   SoapClient options with extended ones:
+   *   - string passphrase - symetric key to decode private key.
+   *   - string local_cert - path to PEM file with private key and X509
+   *     authentication certificate.
+   *   - string certificate_chain - path to PEM file public X509 certificates
+   *     used to authenticate peer.
+   *
    * @return string
-   * @throws SoapFault on curl connection error
+   *   XML SOAP response.
+   *
+   * @throws SoapFault
+   *   On curl connection error.
    */
   protected function callCurl($url, $data = NULL, $options = array()) {
     $handle = curl_init();
@@ -68,12 +87,12 @@ class SafeSoapClient extends SoapClient {
       curl_setopt($handle, CURLOPT_CAINFO, $options['certificate_chain']);
     }
 
-    if (isset( $data )) {
+    if (isset($data)) {
       curl_setopt($handle, CURLOPT_POSTFIELDS, $data);
     }
     $response = curl_exec($handle);
     if (empty($response)) {
-      throw new SoapFault((string)curl_errno($handle), 'Network error: ' . curl_error($handle));
+      throw new SoapFault((string) curl_errno($handle), 'Network error: ' . curl_error($handle));
     }
     curl_close($handle);
     return $response;
