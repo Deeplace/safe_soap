@@ -24,6 +24,9 @@ class SafeSoapClient extends SoapClient {
 
     if (strncmp($wsdl_addr_type, 'http', 4)==0) {
       $cache_file = sys_get_temp_dir() . "/safe_soap.wsdl-" . md5($wsdl);
+      if (php_sapi_name() == 'cli') {
+        $cache_file .= '-cli';
+      }
 
       $url = $wsdl;
       $wsdl = $cache_file;
