@@ -75,7 +75,7 @@ class SafeSoapClient extends SoapClient {
     $options = $this->options;
     $handle = curl_init();
     curl_setopt($handle, CURLOPT_TIMEOUT, 240);
-    curl_setopt($handle, CURLOPT_CONNECTTIMEOUT, 5);
+    curl_setopt($handle, CURLOPT_CONNECTTIMEOUT, 15);
     curl_setopt($handle, CURLINFO_HEADER_OUT, TRUE);
     curl_setopt($handle, CURLOPT_HEADER, FALSE);
     curl_setopt($handle, CURLOPT_URL, $url);
