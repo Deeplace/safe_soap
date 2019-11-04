@@ -26,6 +26,19 @@ class SafeSoapClient extends SoapClient {
    *    for libcurl compiled against NSS (vs. OpenSSL) which does not send
    *    chain passed via CURLOPT_SSLCERT, and requires both chains set
    *    via CURLOPT_CAINFO.
+   * - $options['certificate_chain'] - path to file containing both client auth
+   *      certificate chain and server certificate chain. This is workaround
+   *      for libcurl compiled against NSS (vs. OpenSSL) which does not send
+   *      chain passed via CURLOPT_SSLCERT, and requires both chains set via
+   *      CURLOPT_CAINFO.
+   * - $options['local_cert'] -  path to PEM file with private key and X509
+   *     authentication certificate.
+   * - $options['passphrase'] - symetric key to decode private key of client
+   *     auth certificate.
+   * - $options['connect_timeout'] - connect timeout in seconds set via
+   *                           CURLOPT_CONNECTTIMEOUT, default value is 15.
+   * - $options['timeout'] - request timeout in seconds set via CURLOPT_TIMEOUT
+   *                         default value is 240.
    */
   public function __construct($wsdl, $options = array()) {
     $this->options = $options;
@@ -56,14 +69,7 @@ class SafeSoapClient extends SoapClient {
    * @param string $data
    *   URL encoded POST params.
    * @param array $headers
-   *  List of HTTP headers as strings "Key: value"
-   * @param array $options
-   *   SoapClient options with extended ones:
-   *   - string passphrase - symetric key to decode private key.
-   *   - string local_cert - path to PEM file with private key and X509
-   *     authentication certificate.
-   *   - string certificate_chain - path to PEM file public X509 certificates
-   *     used to authenticate peer.
+   *   List of HTTP headers as strings "Key: value".
    *
    * @return string
    *   XML SOAP response.
@@ -71,11 +77,11 @@ class SafeSoapClient extends SoapClient {
    * @throws SoapFault
    *   On curl connection error.
    */
-  private function callCurl($url, $data = NULL, $headers = array()) {
+  private function callCurl($url, $data = NULL, array $headers = array()) {
     $options = $this->options;
     $handle = curl_init();
-    curl_setopt($handle, CURLOPT_TIMEOUT, 240);
-    curl_setopt($handle, CURLOPT_CONNECTTIMEOUT, 15);
+    curl_setopt($handle, CURLOPT_TIMEOUT, isset($options['timeout']) ? $options['timeout'] : 240);
+    curl_setopt($handle, CURLOPT_CONNECTTIMEOUT, isset($options['connect_timeout']) ? $options['connect_timeout'] : 15);
     curl_setopt($handle, CURLINFO_HEADER_OUT, TRUE);
     curl_setopt($handle, CURLOPT_HEADER, FALSE);
     curl_setopt($handle, CURLOPT_URL, $url);
@@ -114,11 +120,15 @@ class SafeSoapClient extends SoapClient {
     return $response;
   }
 
-  public function __doRequest($request, $location, $action, $version, $one_way = null) {
-    $headers = array('Content-Type: text/xml; charset=utf-8', 'SOAPAction: "'.$action.'"');
+  /**
+   * Magic method.
+   */
+  public function __doRequest($request, $location, $action, $version, $one_way = NULL) {
+    $headers = array('Content-Type: text/xml; charset=utf-8', 'SOAPAction: "' . $action . '"');
     if ($one_way) {
       $this->callCurl($location, $request, $headers);
-    } else {
+    }
+    else {
       return $this->callCurl($location, $request, $headers);
     }
   }
