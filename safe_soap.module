@@ -46,10 +46,18 @@ class SafeSoapClient extends SoapClient {
     $wsdl_addr_type = parse_url($wsdl, PHP_URL_SCHEME);
 
     if (strncmp($wsdl_addr_type, 'http', 4) === 0) {
-      $cache_file = sys_get_temp_dir() . "/safe_soap.wsdl-" . md5($wsdl);
+      $cache_file = '';
+      $header = get_headers($wsdl)[0];
+      preg_match('/[0-9]\d\d/', $header, $matches);
+      $http_status = (int) $matches[0];
 
       $url = $wsdl;
-      $wsdl = $cache_file;
+
+      if ($http_status === 200) {
+        $cache_file = sys_get_temp_dir() . "/safe_soap.wsdl-" . md5($wsdl);
+        $wsdl = $cache_file;
+      }
+
       // Only fetch a new wsdl every hour.
       if (!file_exists($cache_file) || filectime($cache_file) < time() - 3600) {
         if (!file_put_contents($cache_file, $this->callCurl($url))) {
@@ -88,6 +96,7 @@ class SafeSoapClient extends SoapClient {
     curl_setopt($handle, CURLOPT_FAILONERROR, FALSE);
     curl_setopt($handle, CURLOPT_HTTPHEADER, $headers);
     curl_setopt($handle, CURLOPT_RETURNTRANSFER, TRUE);
+
     if (array_key_exists('local_cert', $options)) {
       curl_setopt($handle, CURLOPT_SSLCERT, $options['local_cert']);
       if (array_key_exists('certificate_chain', $options)) {
@@ -98,6 +107,7 @@ class SafeSoapClient extends SoapClient {
         curl_setopt($handle, CURLOPT_SSLCERTPASSWD, $options['passphrase']);
       }
     }
+
     if (array_key_exists('certificate_chain', $options) && !empty($options['certificate_chain'])) {
       curl_setopt($handle, CURLOPT_CAINFO, $options['certificate_chain']);
     }
@@ -105,16 +115,20 @@ class SafeSoapClient extends SoapClient {
     if (isset($data)) {
       curl_setopt($handle, CURLOPT_POSTFIELDS, $data);
     }
+
     $response = curl_exec($handle);
     $this->curl_errorno = curl_errno($handle);
+
     if ($this->curl_errorno == CURLE_OK) {
       $this->curl_statuscode = curl_getinfo($handle, CURLINFO_HTTP_CODE);
     }
+
     if (empty($response)) {
       $this->curl_errormsg = curl_error($handle);
       curl_close($handle);
       throw new SoapFault((string) $this->curl_errorno, sprintf('Network error (%s): %s', $url, $this->curl_errormsg));
     }
+
     curl_close($handle);
 
     return $response;
@@ -132,5 +146,4 @@ class SafeSoapClient extends SoapClient {
       return $this->callCurl($location, $request, $headers);
     }
   }
-
 }
