@@ -39,6 +39,9 @@ class SafeSoapClient extends SoapClient {
    *                           CURLOPT_CONNECTTIMEOUT, default value is 15.
    * - $options['timeout'] - request timeout in seconds set via CURLOPT_TIMEOUT
    *                         default value is 240.
+   * @param $wsdl
+   * @param array $options
+   * @throws SoapFault
    */
   public function __construct($wsdl, $options = array()) {
     $this->options = $options;
@@ -47,11 +50,10 @@ class SafeSoapClient extends SoapClient {
 
     if (strncmp($wsdl_addr_type, 'http', 4) === 0) {
       $cache_file = '';
-      $header = get_headers($wsdl)[0];
-      preg_match('/[0-9]\d\d/', $header, $matches);
+      $response = $this->callCurl($wsdl, NULL, array(),  TRUE);
+      list($response_headers, $response_body) = explode("\r\n\r\n", $response, 2);
+      preg_match('/[0-9]\d\d/', $response_headers, $matches);
       $http_status = (int) $matches[0];
-
-      $url = $wsdl;
 
       if ($http_status === 200) {
         $cache_file = sys_get_temp_dir() . "/safe_soap.wsdl-" . md5($wsdl);
@@ -60,7 +62,7 @@ class SafeSoapClient extends SoapClient {
 
       // Only fetch a new wsdl every hour.
       if (!file_exists($cache_file) || filectime($cache_file) < time() - 3600) {
-        if (!file_put_contents($cache_file, $this->callCurl($url))) {
+        if (!file_put_contents($cache_file, $response_body)) {
           throw new SoapFault(SAFE_SOAP_CACHE_ERROR, "Service description unavailable");
         }
       }
@@ -78,20 +80,21 @@ class SafeSoapClient extends SoapClient {
    *   URL encoded POST params.
    * @param array $headers
    *   List of HTTP headers as strings "Key: value".
-   *
+   * @param bool $response_headers
+   *   True if need response headers.
    * @return string
    *   XML SOAP response.
    *
-   * @throws SoapFault
-   *   On curl connection error.
+   * @throws SoapFault On curl connection error.
    */
-  private function callCurl($url, $data = NULL, array $headers = array()) {
+  private function callCurl($url, $data = NULL, array $headers = array(), $response_headers = FALSE) {
     $options = $this->options;
     $handle = curl_init();
+
     curl_setopt($handle, CURLOPT_TIMEOUT, isset($options['timeout']) ? $options['timeout'] : 240);
     curl_setopt($handle, CURLOPT_CONNECTTIMEOUT, isset($options['connect_timeout']) ? $options['connect_timeout'] : 15);
     curl_setopt($handle, CURLINFO_HEADER_OUT, TRUE);
-    curl_setopt($handle, CURLOPT_HEADER, FALSE);
+    curl_setopt($handle, CURLOPT_HEADER, $response_headers);
     curl_setopt($handle, CURLOPT_URL, $url);
     curl_setopt($handle, CURLOPT_FAILONERROR, FALSE);
     curl_setopt($handle, CURLOPT_HTTPHEADER, $headers);
