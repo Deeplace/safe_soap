@@ -45,21 +45,21 @@ class SafeSoapClient extends SoapClient {
    */
   public function __construct($wsdl, $options = array()) {
     $this->options = $options;
+    $cache_file = NULL;
 
     $wsdl_addr_type = parse_url($wsdl, PHP_URL_SCHEME);
 
     if (strncmp($wsdl_addr_type, 'http', 4) === 0) {
-      $cache_file = NULL;
       $response = $this->callCurl($wsdl);
-      $http_status = $this->curl_statuscode;
+      $http_status = (int) $this->curl_statuscode;
 
-      if (strlen($http_status) === 3 && substr($http_status, 0, 1) === '2') {
+      if ($http_status >= 200 && $http_status < 300) {
         $cache_file = sys_get_temp_dir() . "/safe_soap.wsdl-" . md5($wsdl);
         $wsdl = $cache_file;
       }
 
       // Only fetch a new wsdl every hour.
-      if (!is_null($cache_file) && !file_exists($cache_file) || filectime($cache_file) < time() - 3600) {
+      if (!empty($cache_file) && (!file_exists($cache_file) || filectime($cache_file) < time() - 3600)) {
         if (!file_put_contents($cache_file, $response)) {
           throw new SoapFault(SAFE_SOAP_CACHE_ERROR, "Service description unavailable");
         }
