@@ -1,7 +1,7 @@
 ; $Id$
 name = Safe SOAP
 description = Allow network-failure safe use of SoapClient
-version = 7.x-1.0
+version = 7.x-2.0
 core = 7.x
 package = deeplace
 

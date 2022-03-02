@@ -133,7 +133,7 @@ class SafeSoapClient extends SoapClient {
   /**
    * Magic method.
    */
-  public function __doRequest($request, $location, $action, $version, $one_way = NULL) {
+  public function __doRequest(string $request, string $location, string $action, int $version, bool $one_way = FALSE): ?string {
     $headers = array('Content-Type: text/xml; charset=utf-8', 'SOAPAction: "' . $action . '"');
     if ($one_way) {
       $this->callCurl($location, $request, $headers);
