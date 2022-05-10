@@ -119,10 +119,10 @@ class SafeSoapClient extends SoapClient {
       curl_setopt($handle, CURLOPT_CAINFO, $options['certificate_chain']);
     }
     if (array_key_exists('capath', $options) && !empty($options['capath'])) {
-      curl_setopt($handle, CURLOPT_CAINFO, $options['capath']);
+      curl_setopt($handle, CURLOPT_CAPATH, $options['capath']);
     }
     if (array_key_exists('cafile', $options) && !empty($options['cafile'])) {
-      curl_setopt($handle, CURLOPT_CAPATH, $options['cafile']);
+      curl_setopt($handle, CURLOPT_CAINFO, $options['cafile']);
     }
 
     if (isset($data)) {
