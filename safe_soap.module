@@ -33,6 +33,11 @@ class SafeSoapClient extends SoapClient {
    *      CURLOPT_CAINFO.
    * - $options['local_cert'] -  path to PEM file with private key and X509
    *     authentication certificate.
+   * - $options['local_pk'] -  path to PEM file with private key.
+   * - $options['cafile'] -  path to PEM file with several PEM certs used to
+   *     verify peer.
+   * - $options['capath'] -  path to directory containing PEM files with certs
+   *     used to verify peer.
    * - $options['passphrase'] - symetric key to decode private key of client
    *     auth certificate.
    * - $options['connect_timeout'] - connect timeout in seconds set via
@@ -97,9 +102,13 @@ class SafeSoapClient extends SoapClient {
 
     if (array_key_exists('local_cert', $options)) {
       curl_setopt($handle, CURLOPT_SSLCERT, $options['local_cert']);
-      if (array_key_exists('certificate_chain', $options)) {
+
+      if (array_key_exists('local_pk', $options)) {
+        curl_setopt($handle, CURLOPT_SSLKEY, $options['local_pk']);
+      } elseif (array_key_exists('certificate_chain', $options)) {
         curl_setopt($handle, CURLOPT_SSLKEY, $options['local_cert']);
       }
+
       if (array_key_exists('passphrase', $options)) {
         curl_setopt($handle, CURLOPT_KEYPASSWD, $options['passphrase']);
         curl_setopt($handle, CURLOPT_SSLCERTPASSWD, $options['passphrase']);
@@ -108,6 +117,12 @@ class SafeSoapClient extends SoapClient {
 
     if (array_key_exists('certificate_chain', $options) && !empty($options['certificate_chain'])) {
       curl_setopt($handle, CURLOPT_CAINFO, $options['certificate_chain']);
+    }
+    if (array_key_exists('capath', $options) && !empty($options['capath'])) {
+      curl_setopt($handle, CURLOPT_CAPATH, $options['capath']);
+    }
+    if (array_key_exists('cafile', $options) && !empty($options['cafile'])) {
+      curl_setopt($handle, CURLOPT_CAINFO, $options['cafile']);
     }
 
     if (isset($data)) {
