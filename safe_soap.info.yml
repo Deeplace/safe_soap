@@ -1,0 +1,5 @@
+name: Safe SOAP
+type: module
+description:  Allow network-failure safe use of SoapClient
+core_version_requirement: ^11
+package: Deeplace
