@@ -1,20 +1,24 @@
 <?php
 
-/**
- * @file
- * SafeSoapClient wrapper class.
- */
+namespace Drupal\safe_soap;
 
-/**
- * Error code what occur when WSDL cache could not be created.
- */
-define('SAFE_SOAP_CACHE_ERROR', 1);
+use Drupal\safe_soap\Exception\NetworkError;
+use Drupal\safe_soap\Exception\ServiceDescriptionUnavailable;
 
 /**
  * A child of SoapClient with network failure handling support.
  */
-class SafeSoapClient extends SoapClient {
-  private $options = [];
+class SafeSoapClient extends \SoapClient {
+
+  /**
+   * Option.
+   */
+  private array $options;
+
+  /**
+   * The cURL status code.
+   */
+  private ?int $curlStatusCode;
 
   /**
    * Extended SoapClient constructor.
@@ -44,29 +48,33 @@ class SafeSoapClient extends SoapClient {
    *                           CURLOPT_CONNECTTIMEOUT, default value is 15.
    * - $options['timeout'] - request timeout in seconds set via CURLOPT_TIMEOUT
    *                         default value is 240.
-   * @param $wsdl
+   *
+   * @param string $wsdl
+   *   The wsdl path.
    * @param array $options
-   * @throws SoapFault
+   *   The client options.
+   *
+   * @throws \Drupal\safe_soap\ServiceDescriptionUnavailable.
    */
-  public function __construct($wsdl, $options = array()) {
+  public function __construct(string $wsdl, array $options = []) {
     $this->options = $options;
-    $cache_file = NULL;
+    $cacheFile = NULL;
 
-    $wsdl_addr_type = parse_url($wsdl, PHP_URL_SCHEME);
+    $wsdlAddrType = parse_url($wsdl, PHP_URL_SCHEME);
 
-    if (strncmp($wsdl_addr_type, 'http', 4) === 0) {
+    if (strncmp($wsdlAddrType, 'http', 4) === 0) {
       $response = $this->callCurl($wsdl);
-      $http_status = (int) $this->curl_statuscode;
+      $httpStatus = (int) $this->curlStatusCode;
 
-      if (!empty($response) && $http_status >= 200 && $http_status < 300) {
-        $cache_file = sys_get_temp_dir() . "/safe_soap.wsdl-" . md5($wsdl);
-        $wsdl = $cache_file;
+      if (!empty($response) && $httpStatus >= 200 && $httpStatus < 300) {
+        $cacheFile = sys_get_temp_dir() . "/safe_soap.wsdl-" . md5($wsdl);
+        $wsdl = $cacheFile;
       }
 
       // Only fetch a new wsdl every hour.
-      if (!empty($cache_file) && (!file_exists($cache_file) || filectime($cache_file) < time() - 3600)) {
-        if (!file_put_contents($cache_file, $response)) {
-          throw new SoapFault(SAFE_SOAP_CACHE_ERROR, "Service description unavailable");
+      if (!empty($cacheFile) && (!file_exists($cacheFile) || filectime($cacheFile) < time() - 3600)) {
+        if (!file_put_contents($cacheFile, $response)) {
+          throw new ServiceDescriptionUnavailable();
         }
       }
     }
@@ -83,16 +91,19 @@ class SafeSoapClient extends SoapClient {
    *   URL encoded POST params.
    * @param array $headers
    *   List of HTTP headers as strings "Key: value".
+   *
    * @return string
    *   XML SOAP response.
-   * @throws SoapFault On curl connection error.
+   *
+   * @throws \Drupal\safe_soap\Exception\NetworkError
+   *    On curl connection error.
    */
-  private function callCurl($url, $data = NULL, array $headers = array()) {
+  private function callCurl($url, $data = NULL, array $headers = []) {
     $options = $this->options;
     $handle = curl_init();
 
-    curl_setopt($handle, CURLOPT_TIMEOUT, isset($options['timeout']) ? $options['timeout'] : 240);
-    curl_setopt($handle, CURLOPT_CONNECTTIMEOUT, isset($options['connect_timeout']) ? $options['connect_timeout'] : 15);
+    curl_setopt($handle, CURLOPT_TIMEOUT, $options['timeout'] ?? 240);
+    curl_setopt($handle, CURLOPT_CONNECTTIMEOUT, $options['connect_timeout'] ?? 15);
     curl_setopt($handle, CURLINFO_HEADER_OUT, TRUE);
     curl_setopt($handle, CURLOPT_HEADER, FALSE);
     curl_setopt($handle, CURLOPT_URL, $url);
@@ -105,7 +116,8 @@ class SafeSoapClient extends SoapClient {
 
       if (array_key_exists('local_pk', $options)) {
         curl_setopt($handle, CURLOPT_SSLKEY, $options['local_pk']);
-      } elseif (array_key_exists('certificate_chain', $options)) {
+      }
+      elseif (array_key_exists('certificate_chain', $options)) {
         curl_setopt($handle, CURLOPT_SSLKEY, $options['local_cert']);
       }
 
@@ -115,13 +127,15 @@ class SafeSoapClient extends SoapClient {
       }
     }
 
-    if (array_key_exists('certificate_chain', $options) && !empty($options['certificate_chain'])) {
+    if (!empty($options['certificate_chain'])) {
       curl_setopt($handle, CURLOPT_CAINFO, $options['certificate_chain']);
     }
-    if (array_key_exists('capath', $options) && !empty($options['capath'])) {
+
+    if (!empty($options['capath'])) {
       curl_setopt($handle, CURLOPT_CAPATH, $options['capath']);
     }
-    if (array_key_exists('cafile', $options) && !empty($options['cafile'])) {
+
+    if (!empty($options['cafile'])) {
       curl_setopt($handle, CURLOPT_CAINFO, $options['cafile']);
     }
 
@@ -131,13 +145,13 @@ class SafeSoapClient extends SoapClient {
 
     $response = curl_exec($handle);
 
-    $this->curl_errorno = curl_errno($handle);
-    $this->curl_statuscode = curl_getinfo($handle, CURLINFO_RESPONSE_CODE);
-
+    $this->curlStatusCode = curl_getinfo($handle, CURLINFO_RESPONSE_CODE);
     if (empty($response)) {
-      $this->curl_errormsg = curl_error($handle);
+      $errorCode = curl_errno($handle);
+      $errorMessage = curl_error($handle);
       curl_close($handle);
-      throw new SoapFault((string) $this->curl_errorno, sprintf('Network error (%s): %s', $url, $this->curl_errormsg));
+
+      throw new NetworkError($errorCode, sprintf('Network error (%s): %s', $url, $errorMessage));
     }
 
     curl_close($handle);
@@ -147,14 +161,25 @@ class SafeSoapClient extends SoapClient {
 
   /**
    * Magic method.
+   *
+   * @throws \Drupal\safe_soap\Exception\NetworkError
+   *    On curl connection error.
    */
-  public function __doRequest(string $request, string $location, string $action, int $version, bool $one_way = FALSE): ?string {
-    $headers = array('Content-Type: text/xml; charset=utf-8', 'SOAPAction: "' . $action . '"');
-    if ($one_way) {
-      $this->callCurl($location, $request, $headers);
+  public function __doRequest(
+    string $data,
+    string $url,
+    string $action,
+    int $version,
+    bool $oneWay = FALSE,
+  ): ?string {
+    $headers = ['Content-Type: text/xml; charset=utf-8', 'SOAPAction: "' . $action . '"'];
+    if ($oneWay) {
+      $this->callCurl($url, $data, $headers);
+
+      return NULL;
     }
-    else {
-      return $this->callCurl($location, $request, $headers);
-    }
+
+    return $this->callCurl($url, $data, $headers);
   }
+
 }
