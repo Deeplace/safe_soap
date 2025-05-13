@@ -1,0 +1,11 @@
+{
+  "name": "deeplace/safe_soap",
+  "description": "Provides SOAP Client with network-failure safe use",
+  "type": "drupal-module",
+  "license": "GPL-2.0-or-later",
+  "homepage": "https://github.com/Deeplace/safe_soap",
+  "require": {
+    "php": "^8.1",
+    "drupal/core": "^11"
+  }
+}
