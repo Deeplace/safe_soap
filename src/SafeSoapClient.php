@@ -11,7 +11,7 @@ use Drupal\safe_soap\Exception\ServiceDescriptionUnavailable;
 class SafeSoapClient extends \SoapClient {
 
   /**
-   * Option.
+   * Options.
    */
   private array $options;
 
