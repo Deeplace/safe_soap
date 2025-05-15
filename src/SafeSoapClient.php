@@ -55,11 +55,12 @@ class SafeSoapClient extends \SoapClient {
    *   The client options.
    *
    * @throws \Drupal\safe_soap\ServiceDescriptionUnavailable.
+   * @throws \InvalidArgumentException
    */
   public function __construct(string $wsdl, array $options = []) {
+    $this->validateOptions($options);
     $this->options = $options;
     $cacheFile = NULL;
-
     $wsdlAddrType = parse_url($wsdl, PHP_URL_SCHEME);
 
     if (strncmp($wsdlAddrType, 'http', 4) === 0) {
@@ -92,60 +93,22 @@ class SafeSoapClient extends \SoapClient {
    * @param array $headers
    *   List of HTTP headers as strings "Key: value".
    *
-   * @return string
+   * @return string|false
    *   XML SOAP response.
    *
    * @throws \Drupal\safe_soap\Exception\NetworkError
    *    On curl connection error.
    */
-  private function callCurl($url, $data = NULL, array $headers = []) {
-    $options = $this->options;
-    $handle = curl_init();
+  private function callCurl(string $url, mixed $data = NULL, array $headers = []) {
+    $handle = $this->prepareHandle($url, $data, $headers);
 
-    curl_setopt($handle, CURLOPT_TIMEOUT, $options['timeout'] ?? 240);
-    curl_setopt($handle, CURLOPT_CONNECTTIMEOUT, $options['connect_timeout'] ?? 15);
-    curl_setopt($handle, CURLINFO_HEADER_OUT, TRUE);
-    curl_setopt($handle, CURLOPT_HEADER, FALSE);
-    curl_setopt($handle, CURLOPT_URL, $url);
-    curl_setopt($handle, CURLOPT_FAILONERROR, FALSE);
-    curl_setopt($handle, CURLOPT_HTTPHEADER, $headers);
-    curl_setopt($handle, CURLOPT_RETURNTRANSFER, TRUE);
-
-    if (array_key_exists('local_cert', $options)) {
-      curl_setopt($handle, CURLOPT_SSLCERT, $options['local_cert']);
-
-      if (array_key_exists('local_pk', $options)) {
-        curl_setopt($handle, CURLOPT_SSLKEY, $options['local_pk']);
-      }
-      elseif (array_key_exists('certificate_chain', $options)) {
-        curl_setopt($handle, CURLOPT_SSLKEY, $options['local_cert']);
-      }
-
-      if (array_key_exists('passphrase', $options)) {
-        curl_setopt($handle, CURLOPT_KEYPASSWD, $options['passphrase']);
-        curl_setopt($handle, CURLOPT_SSLCERTPASSWD, $options['passphrase']);
-      }
-    }
-
-    if (!empty($options['certificate_chain'])) {
-      curl_setopt($handle, CURLOPT_CAINFO, $options['certificate_chain']);
-    }
-
-    if (!empty($options['capath'])) {
-      curl_setopt($handle, CURLOPT_CAPATH, $options['capath']);
-    }
-
-    if (!empty($options['cafile'])) {
-      curl_setopt($handle, CURLOPT_CAINFO, $options['cafile']);
-    }
-
-    if (isset($data)) {
-      curl_setopt($handle, CURLOPT_POSTFIELDS, $data);
+    if ($handle == FALSE) {
+      return FALSE;
     }
 
     $response = curl_exec($handle);
-
     $this->curlStatusCode = curl_getinfo($handle, CURLINFO_RESPONSE_CODE);
+
     if (empty($response)) {
       $errorCode = curl_errno($handle);
       $errorMessage = curl_error($handle);
@@ -157,6 +120,66 @@ class SafeSoapClient extends \SoapClient {
     curl_close($handle);
 
     return $response;
+  }
+
+  /**
+   * Prepares a configured cURL handle.
+   */
+  private function prepareHandle(string $url, mixed $data = NULL, array $headers = []): \CurlHandle|false {
+    $handle = curl_init();
+
+    curl_setopt($handle, CURLOPT_TIMEOUT, $this->options['timeout'] ?? 240);
+    curl_setopt($handle, CURLOPT_CONNECTTIMEOUT, $this->options['connect_timeout'] ?? 15);
+    curl_setopt($handle, CURLINFO_HEADER_OUT, TRUE);
+    curl_setopt($handle, CURLOPT_HEADER, FALSE);
+    curl_setopt($handle, CURLOPT_URL, $url);
+    curl_setopt($handle, CURLOPT_FAILONERROR, FALSE);
+    curl_setopt($handle, CURLOPT_HTTPHEADER, $headers);
+    curl_setopt($handle, CURLOPT_RETURNTRANSFER, TRUE);
+
+    if (array_key_exists('local_cert', $this->options)) {
+      curl_setopt($handle, CURLOPT_SSLCERT, $this->options['local_cert']);
+
+      if (array_key_exists('local_pk', $this->options)) {
+        curl_setopt($handle, CURLOPT_SSLKEY, $this->options['local_pk']);
+      }
+      elseif (array_key_exists('certificate_chain', $this->options)) {
+        curl_setopt($handle, CURLOPT_SSLKEY, $this->options['local_cert']);
+      }
+
+      if (array_key_exists('passphrase', $this->options)) {
+        curl_setopt($handle, CURLOPT_KEYPASSWD, $this->options['passphrase']);
+        curl_setopt($handle, CURLOPT_SSLCERTPASSWD, $this->options['passphrase']);
+      }
+    }
+
+    if (!empty($this->options['certificate_chain'])) {
+      curl_setopt($handle, CURLOPT_CAINFO, $this->options['certificate_chain']);
+    }
+    elseif (!empty($this->options['capath'])) {
+      curl_setopt($handle, CURLOPT_CAPATH, $this->options['capath']);
+    }
+
+    if (!empty($this->options['cafile'])) {
+      curl_setopt($handle, CURLOPT_CAINFO, $this->options['cafile']);
+    }
+
+    if (!empty($data)) {
+      curl_setopt($handle, CURLOPT_POSTFIELDS, $data);
+    }
+
+    return $handle;
+  }
+
+  /**
+   * Validate options.
+   *
+   * @throws \InvalidArgumentException
+   */
+  private function validateOptions(array $options) {
+    if (!empty($options['certificate_chain']) && !empty($options['cafile'])) {
+      throw new \InvalidArgumentException('Only one of "certificate_chain" or "cafile" should be set.');
+    }
   }
 
   /**
