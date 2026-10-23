@@ -194,6 +194,7 @@ class SafeSoapClient extends \SoapClient {
     string $action,
     int $version,
     bool $oneWay = FALSE,
+    ?string $uriParserClass = NULL
   ): ?string {
     $headers = ['Content-Type: text/xml; charset=utf-8', 'SOAPAction: "' . $action . '"'];
     if ($oneWay) {
