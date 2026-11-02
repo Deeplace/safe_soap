@@ -112,12 +112,9 @@ class SafeSoapClient extends \SoapClient {
     if (empty($response)) {
       $errorCode = curl_errno($handle);
       $errorMessage = curl_error($handle);
-      curl_close($handle);
 
       throw new NetworkError($errorCode, sprintf('Network error (%s): %s', $url, $errorMessage));
     }
-
-    curl_close($handle);
 
     return $response;
   }
